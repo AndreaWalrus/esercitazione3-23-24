@@ -18,9 +18,9 @@ Output:
 */
 Image smooth_image(const Image& im, float sigma)
 {
-    // TODO: Your code here
-    NOT_IMPLEMENTED();
-    return im;
+    Image mask = make_gaussian_filter(sigma);
+    Image ret = convolve_image(im, mask, true);
+    return ret;
 }
 
 
@@ -34,9 +34,35 @@ Output:
 */
 pair<Image,Image> compute_gradient(const Image& im)
 {
-    // TODO: Your code here
-    NOT_IMPLEMENTED();
-    return{im, im};
+    pair<Image,Image> sobel = sobel_image(im);
+
+    feature_normalize(sobel.first);
+
+    //Normalize direction in [-pi,pi]
+    float max=-4;
+    float min=4;
+
+    for(int j=0; j<sobel.second.h; j++){
+        for(int i=0; i<sobel.second.w; i++){
+            float val = sobel.second.clamped_pixel(i,j,0);
+            if(val>max) max=val;
+            if(val<min) min=val;
+        }
+    }
+
+
+    for(int j=0; j<sobel.second.h; j++){
+        for(int i=0; i<sobel.second.w; i++){
+            if(max==min) sobel.second.set_pixel(i,j,0,0);
+            else{
+                float val = ((sobel.second.clamped_pixel(i,j,0)-min)*2*M_PI)/(max-min)-M_PI;
+                sobel.second.set_pixel(i,j,0,val);
+            }
+        }
+    }
+
+
+    return sobel;
 }
 
 
@@ -51,24 +77,37 @@ Output:
 Image non_maximum_suppression(const Image& mag, const Image& dir)
 {
     Image nms(mag.w, mag.h, 1);
-    float neighbor1, neighbor2;
+    float neighbor1, neighbor2, val;
 
     // Iterate through the image and perform non-maximum suppression
     for (int y = 0; y < mag.h; y++) {
         for (int x = 0; x < mag.w; x++) {
             
-            // TODO: Your code here
-            NOT_IMPLEMENTED();
+            int theta = round(dir.clamped_pixel(x,y,0)/(M_PI/4));
 
-            // Get the direction of the gradient at the current pixel
+            if(theta==1 || theta==-3){ //i+1,j+1/i-1,j-1
+                val = mag.clamped_pixel(x,y,0);
+                neighbor1 = mag.clamped_pixel(x+1,y+1,0);
+                neighbor2 = mag.clamped_pixel(x-1,y-1,0);
+            }else if(theta==2 || theta==-2){ //i,j+1/i,j-1
+                val = mag.clamped_pixel(x,y,0);
+                neighbor1 = mag.clamped_pixel(x,y+1,0);
+                neighbor2 = mag.clamped_pixel(x,y-1,0);
+            }else if(theta==3 || theta==-1){ //i-1,j+1/i+1,j-1
+                val = mag.clamped_pixel(x,y,0);
+                neighbor1 = mag.clamped_pixel(x-1,y+1,0);
+                neighbor2 = mag.clamped_pixel(x+1,y-1,0);
+            }else{ //i-1,j/i+1,j
+                val = mag.clamped_pixel(x,y,0);
+                neighbor1 = mag.clamped_pixel(x-1,y,0);
+                neighbor2 = mag.clamped_pixel(x+1,y,0);
+            }
 
-            // Round the direction to the nearest multiple of PI/4
-
-            // Get the magnitude of the gradient of the two neighbors along that direction
-            // (Hint: use clamped_pixel to avoid going out of bounds)            
-
-            // If the magnitude of the gradient of the current pixel is greater than that of both neighbors,
-            // then it is a local maximum
+            if(neighbor1>val || neighbor2>val){
+                nms.set_pixel(x,y,0,0);
+            }else{
+                nms.set_pixel(x,y,0,val);
+            }
         }
     }
 
@@ -92,8 +131,20 @@ Image double_thresholding(const Image& im, float lowThreshold, float highThresho
 {
     Image res(im.w, im.h, im.c);
 
-    // TODO: Your code here
-    NOT_IMPLEMENTED();
+    for(int c=0; c<im.c; c++){
+        for(int j=0; j<im.h; j++){
+            for(int i=0; i<im.w; i++){
+                float val = im.clamped_pixel(i,j,c);
+                if(val>highThreshold){
+                    res.set_pixel(i,j,c,strongVal);
+                }else if(val<lowThreshold){
+                    res.set_pixel(i,j,c,0);
+                }else{
+                    res.set_pixel(i,j,c,weakVal);
+                }
+            }
+        }
+    }
 
     return res;
 }
@@ -112,12 +163,22 @@ Image edge_tracking(const Image& im, float weak, float strong)
 {
     Image res(im.w, im.h, im.c);
 
-    for (int y=0; y < im.h; ++y) {
-        for (int x=0; x < im.w; ++x) {
-            // TODO: Your code here
-            NOT_IMPLEMENTED();
-
-            // Hint: use clamped_pixel when checking the neighbors to avoid going out of bounds
+    for(int c=0; c<im.c; c++){
+        for (int y=0; y < im.h; ++y) {
+            for (int x=0; x < im.w; ++x) {
+                if(im.clamped_pixel(x,y,c)==weak){
+                    bool check1 = im.clamped_pixel(x-1,y-1,c)==strong || im.clamped_pixel(x,y-1,c)==strong || im.clamped_pixel(x+1,y-1,c)==strong;
+                    bool check2 = im.clamped_pixel(x-1,y,c)==strong || im.clamped_pixel(x+1,y,c)==strong;
+                    bool check3 = im.clamped_pixel(x-1,y+1,c)==strong || im.clamped_pixel(x,y+1,c)==strong || im.clamped_pixel(x+1,y+1,c)==strong;
+                    if(check1 || check2 || check3){
+                        res.set_pixel(x,y,c,strong);
+                    }else{
+                        res.set_pixel(x,y,c,0);
+                    }
+                }else{
+                    res.set_pixel(x,y,c,im.clamped_pixel(x,y,c));
+                }
+            }
         }
     }
     return res;

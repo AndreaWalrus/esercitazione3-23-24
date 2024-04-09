@@ -71,8 +71,12 @@ Image convolve_image(const Image &im, const Image &filter, bool preserve) {
                 for(int j_m=0; j_m<filter.h; j_m++){
                     for(int i_m=0; i_m<filter.w; i_m++){
                         q += filter.clamped_pixel(i_m,j_m,0)*im.clamped_pixel(x_s+i_m,y_s+j_m,0);
-                        q += filter.clamped_pixel(i_m,j_m,0)*im.clamped_pixel(x_s+i_m,y_s+j_m,1);
-                        q += filter.clamped_pixel(i_m,j_m,0)*im.clamped_pixel(x_s+i_m,y_s+j_m,2);
+                        if(im.c>1){
+                            q += filter.clamped_pixel(i_m,j_m,0)*im.clamped_pixel(x_s+i_m,y_s+j_m,1);
+                        }
+                        if(im.c>2){
+                            q += filter.clamped_pixel(i_m,j_m,0)*im.clamped_pixel(x_s+i_m,y_s+j_m,2);
+                        }
                     }
                 }
                 ret.set_pixel(i,j,0,q);
